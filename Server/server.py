@@ -1,7 +1,7 @@
 import socket
 import json
 from datetime import datetime
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, joinedload
 from models import engine, HoaDon, ChiTietHoaDon, BangGia
 from threading import Lock, Thread
 from queue import Queue
