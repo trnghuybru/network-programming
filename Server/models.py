@@ -97,6 +97,3 @@ class Tuyen(Base):
 # Tạo các bảng trong cơ sở dữ liệu
 Base.metadata.create_all(engine)
 
-# Khởi tạo session để làm việc với cơ sở dữ liệu
-Session = sessionmaker(bind=engine)
-session = Session()
