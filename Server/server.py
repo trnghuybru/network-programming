@@ -8,8 +8,11 @@ from threading import Thread
 from queue import Queue
 import logging
 
-from models import Base, HoaDon, ChiTietHoaDon, BangGia, GioTau, Ga, Tau, Ghe
+from models import Base, HoaDon, ChiTietHoaDon, BangGia, GioTau, Ga, Tau, Tuyen
 
+
+HOST = "192.168.1.20"
+PORT = 2704
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -20,18 +23,17 @@ Session = sessionmaker(bind=engine)
 # Hàng đợi để xử lý các yêu cầu từ các ga
 request_queue = Queue()
 
-def search_trains(ga_di_id, ga_den_id, ngay_di):
+def search_trains(tuyen_id, ngay_khoi_hanh):
     """
-    Hàm tìm kiếm các chuyến tàu phù hợp.
+    Hàm tìm kiếm các chuyến tàu phù hợp dựa trên TuyenID và NgayKhoiHanh.
     """
     session = Session()
     try:
-        start_of_day = datetime.strptime(ngay_di, '%Y-%m-%d')
+        start_of_day = datetime.strptime(ngay_khoi_hanh, '%Y-%m-%d')
         end_of_day = start_of_day + timedelta(days=1)
 
-        trains = session.query(GioTau).filter(
-            GioTau.GaID == ga_di_id,
-            GioTau.GaDen == ga_den_id,
+        trains = session.query(GioTau).join(Tau).join(Tuyen).filter(
+            Tuyen.TuyenID == tuyen_id,
             GioTau.GioDi >= start_of_day,
             GioTau.GioDi < end_of_day
         ).options(
@@ -129,14 +131,44 @@ def book_ticket(data):
     finally:
         session.close()
 
+def get_all_routes():
+    """
+    Hàm lấy tất cả các tuyến từ cơ sở dữ liệu.
+    """
+    session = Session()
+    try:
+        # Truy vấn tất cả các tuyến từ bảng 'Tuyen'
+        routes = session.query(Tuyen).all()
+
+        # Nếu không tìm thấy tuyến nào, trả về thông báo lỗi
+        if not routes:
+            return {"status": "error", "message": "Không có tuyến nào trong hệ thống."}
+
+        # Tạo danh sách các tuyến
+        route_list = [{
+            "TuyenID": route.TuyenID,
+            "Ten": route.Ten,
+            "Huong": route.Huong
+        } for route in routes]
+
+        return {"status": "success", "data": route_list}
+
+    except Exception as e:
+        logging.error(f"Lỗi khi lấy danh sách các tuyến: {str(e)}")
+        return {"status": "error", "message": "Đã xảy ra lỗi khi lấy danh sách các tuyến."}
+    finally:
+        session.close()
+
 def handle_request(action, data):
     """
     Hàm xử lý yêu cầu dựa trên loại hành động (action).
     """
     if action == "search_trains":
-        return search_trains(data['GaDi'], data['GaDen'], data['NgayDi'])
+        return search_trains(data['TuyenID'], data['NgayDi'])
     elif action == "book_ticket":
         return book_ticket(data)
+    elif action == "get_all_routes":
+        return get_all_routes()
     else:
         return {"status": "error", "message": "Hành động không hợp lệ."}
 
@@ -156,9 +188,9 @@ def main():
     Thread(target=handle_requests, daemon=True).start()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(('127.0.0.1', 2704))
+    sock.bind((HOST,PORT))
     sock.listen(5)
-    logging.info("Server đang lắng nghe tại 127.0.0.1:2704...")
+    logging.info(f"Server đang lắng nghe tại {HOST}:{PORT}...")
 
     while True:
         connection, address = sock.accept()
