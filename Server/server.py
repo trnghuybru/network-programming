@@ -1,5 +1,6 @@
 import socket
 import json
+from  sqlalchemy import and_
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker, joinedload
@@ -8,11 +9,12 @@ from threading import Thread
 from queue import Queue
 import logging
 
-from models import Base, HoaDon, ChiTietHoaDon, BangGia, GioTau, Ga, Tau, Tuyen
+from models import Base, HoaDon, ChiTietHoaDon, BangGia, GioTau, Tuyen, Tau, Ga
+
 
 
 HOST = "192.168.1.20"
-PORT = 2704
+PORT = 27047
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -32,26 +34,28 @@ def search_trains(tuyen_id, ngay_khoi_hanh):
         start_of_day = datetime.strptime(ngay_khoi_hanh, '%Y-%m-%d')
         end_of_day = start_of_day + timedelta(days=1)
 
-        trains = session.query(GioTau).join(Tau).join(Tuyen).filter(
-            Tuyen.TuyenID == tuyen_id,
-            GioTau.GioDi >= start_of_day,
-            GioTau.GioDi < end_of_day
-        ).options(
-            joinedload(GioTau.Tau),
-            joinedload(GioTau.Ga)
+        # Truy vấn kết hợp các bảng GioTau, Tau, và Ga
+        trains = session.query(GioTau, Tau, Ga).filter(
+            and_(
+                Tau.TuyenID == tuyen_id,
+                GioTau.TauID == Tau.TauID,
+                GioTau.GaID == Ga.GaID,
+                GioTau.GioDi >= start_of_day,
+                GioTau.GioDi < end_of_day
+            )
         ).all()
 
         if not trains:
             return {"status": "error", "message": "Không có chuyến tàu phù hợp."}
 
         train_list = [{
-            "TauID": train.TauID,
-            "TenTau": train.Tau.TenTau,
-            "GaDiID": train.GaID,
-            "GaDiTen": train.Ga.Ten,
-            "GioDi": train.GioDi.strftime('%Y-%m-%d %H:%M:%S'),
-            "GioDen": train.GioDen.strftime('%Y-%m-%d %H:%M:%S')
-        } for train in trains]
+            "TauID": tau.TauID,
+            "TenTau": tau.TenTau,
+            "GaDiID": ga.GaID,
+            "GaDiTen": ga.Ten,
+            "GioDi": gio_tau.GioDi.strftime('%Y-%m-%d %H:%M:%S'),
+            "GioDen": gio_tau.GioDen.strftime('%Y-%m-%d %H:%M:%S')
+        } for gio_tau, tau, ga in trains]
 
         return {"status": "success", "data": train_list}
 
@@ -164,10 +168,10 @@ def handle_request(action, data):
     Hàm xử lý yêu cầu dựa trên loại hành động (action).
     """
     if action == "search_trains":
-        return search_trains(data['TuyenID'], data['NgayDi'])
+        return search_trains(data['TuyenID'], data['NgayKhoiHanh'])
     elif action == "book_ticket":
         return book_ticket(data)
-    elif action == "get_all_routes":
+    elif action == "get_all_routes":  # Đã thay đổi từ "get_all_stations"
         return get_all_routes()
     else:
         return {"status": "error", "message": "Hành động không hợp lệ."}
@@ -189,8 +193,8 @@ def main():
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((HOST,PORT))
-    sock.listen(5)
-    logging.info(f"Server đang lắng nghe tại {HOST}:{PORT}...")
+    sock.listen()
+    logging.info("Server đang lắng nghe tại 127.0.0.1:2704...")
 
     while True:
         connection, address = sock.accept()
