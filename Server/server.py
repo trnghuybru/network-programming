@@ -9,12 +9,13 @@ from threading import Thread
 from queue import Queue
 import logging
 
-from models import Base, HoaDon, ChiTietHoaDon, BangGia, GioTau, Tuyen, Tau, Ga
+from models import HoaDon, ChiTietHoaDon, BangGia, GioTau, Tuyen, Tau, Ga, Toa, TauToa, Ghe
 
 
 
-HOST = "192.168.1.20"
-PORT = 27047
+HOST = "192.168.1.164"
+PORT = 27049
+
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -26,26 +27,26 @@ Session = sessionmaker(bind=engine)
 request_queue = Queue()
 
 def search_trains(tuyen_id, ngay_khoi_hanh):
-    """
-    Hàm tìm kiếm các chuyến tàu phù hợp dựa trên TuyenID và NgayKhoiHanh.
-    """
     session = Session()
     try:
         start_of_day = datetime.strptime(ngay_khoi_hanh, '%Y-%m-%d')
         end_of_day = start_of_day + timedelta(days=1)
 
+        print(f"Start of day: {start_of_day}, End of day: {end_of_day}")
+
         # Truy vấn kết hợp các bảng GioTau, Tau, và Ga
-        trains = session.query(GioTau, Tau, Ga).filter(
-            and_(
-                Tau.TuyenID == tuyen_id,
-                GioTau.TauID == Tau.TauID,
-                GioTau.GaID == Ga.GaID,
-                GioTau.GioDi >= start_of_day,
-                GioTau.GioDi < end_of_day
-            )
+        trains = session.query(GioTau, Tau, Ga).join(
+            Tau, GioTau.TauID == Tau.TauID
+        ).join(
+            Ga, GioTau.GaID == Ga.GaID
+        ).filter(
+            Tau.TuyenID == tuyen_id,
+            GioTau.GioDi >= start_of_day,
+            GioTau.GioDi < end_of_day
         ).all()
 
         if not trains:
+            print("Không có chuyến tàu phù hợp.")
             return {"status": "error", "message": "Không có chuyến tàu phù hợp."}
 
         train_list = [{
@@ -62,6 +63,72 @@ def search_trains(tuyen_id, ngay_khoi_hanh):
     except Exception as e:
         logging.error(f"Lỗi khi tìm kiếm chuyến tàu: {str(e)}")
         return {"status": "error", "message": "Đã xảy ra lỗi khi tìm kiếm chuyến tàu."}
+    finally:
+        session.close()
+
+def print_carriages(train_id):
+    session = Session()
+    try:
+        # Truy vấn để lấy thông tin các toa của chuyến tàu
+        carriages = session.query(Toa).join(TauToa).filter(TauToa.TauID == train_id).all()
+
+        if not carriages:
+            print("Không có toa nào trong chuyến tàu này.")
+            return {"status": "error", "message": "Không có toa nào trong chuyến tàu này."}
+
+        carriage_list = [{
+            "ToaID": toa.ToaID,
+            "TenToa": toa.TenToa
+        } for toa in carriages]
+
+        print("Các toa trong chuyến tàu:")
+        for carriage in carriage_list:
+            print(f"ToaID: {carriage['ToaID']}, TenToa: {carriage['TenToa']}")
+
+        return {"status": "success", "data": carriage_list}
+
+    except Exception as e:
+        logging.error(f"Lỗi khi lấy thông tin các toa: {str(e)}")
+        return {"status": "error", "message": "Đã xảy ra lỗi khi lấy thông tin các toa."}
+    finally:
+        session.close()
+
+def print_seats_in_carriage(toa_id, ngay_khoi_hanh):
+    session = Session()
+    try:
+        # Lấy tất cả các ghế trong toa đã chọn
+        seats = session.query(Ghe).filter(Ghe.ToaID == toa_id).all()
+
+        if not seats:
+            print("Không có ghế nào trong toa này.")
+            return {"status": "error", "message": "Không có ghế nào trong toa này."}
+
+        # Lấy danh sách các ghế đã được đặt trong toa này cho ngày khởi hành cụ thể
+        booked_seats = session.query(ChiTietHoaDon.GheID).filter(
+            ChiTietHoaDon.TauID == TauToa.TauID,  # Tìm chuyến tàu phù hợp với Toa
+            ChiTietHoaDon.GheID == Ghe.GheID,    # Kết hợp bảng Ghe và ChiTietHoaDon
+            ChiTietHoaDon.NgayKhoiHanh == ngay_khoi_hanh
+        ).filter(Ghe.ToaID == toa_id).all()
+
+        # Tạo một set chứa các ghế đã đặt để dễ kiểm tra
+        booked_seat_ids = {seat.GheID for seat in booked_seats}
+
+        # In danh sách các ghế và trạng thái đặt
+        seat_list = []
+        for seat in seats:
+            status = "Đã đặt" if seat.GheID in booked_seat_ids else "Còn trống"
+            seat_list.append({
+                "GheID": seat.GheID,
+                "SoGhe": seat.SoGhe,
+                "TrangThai": status
+            })
+            print(f"GheID: {seat.GheID}, SoGhe: {seat.SoGhe}, TrangThai: {status}")
+
+        return {"status": "success", "data": seat_list}
+
+    except Exception as e:
+        logging.error(f"Lỗi khi lấy thông tin ghế: {str(e)}")
+        return {"status": "error", "message": "Đã xảy ra lỗi khi lấy thông tin ghế."}
     finally:
         session.close()
 
@@ -171,8 +238,12 @@ def handle_request(action, data):
         return search_trains(data['TuyenID'], data['NgayKhoiHanh'])
     elif action == "book_ticket":
         return book_ticket(data)
-    elif action == "get_all_routes":  # Đã thay đổi từ "get_all_stations"
+    elif action == "get_all_routes":
         return get_all_routes()
+    elif action == "print_carriages":
+        return print_carriages(data['tau_id'])
+    elif action == "get_seats_in_carriage":
+        return print_seats_in_carriage(data['toa_id'], data['ngay_khoi_hanh'])
     else:
         return {"status": "error", "message": "Hành động không hợp lệ."}
 
