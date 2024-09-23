@@ -168,8 +168,9 @@ def get_start_and_destination_stations(tau_id):
         ga_di_va_ga_den = session.query(
             GioTau.GioID,
             Ga.Ten.label("GaDi"),
-            BangGia.GaDi,
+            BangGia.GaDi.label("GaDiID"),  # ID của ga đi
             Ga.Ten.label("GaDen"),
+            GioTau.GaID.label("GaDenID"),  # ID của ga đến (từ GioTau)
             GioTau.GioDi,
             GioTau.GioDen
         ).join(
@@ -191,8 +192,10 @@ def get_start_and_destination_stations(tau_id):
             ga_list.append({
                 "GioID": ga.GioID,
                 "GaDi": ga.GaDi,
+                "GaDiID": ga.GaDiID,  # ID của ga đi từ BangGia
                 "GioDi": ga.GioDi,
                 "GaDen": ga.GaDen,
+                "GaDenID": GioTau.GaID,  # ID của ga đến từ GioTau
                 "GioDen": ga.GioDen
             })
 
