@@ -13,7 +13,7 @@ from models import HoaDon, ChiTietHoaDon, BangGia, GioTau, Tuyen, Tau, Ga, Toa, 
 
 
 
-HOST = "192.168.48.135"
+HOST = "172.20.10.3"
 PORT = 27049
 
 # Cấu hình logging
@@ -116,7 +116,7 @@ def print_seats_in_carriage(toa_id, ngay_khoi_hanh):
         # In danh sách các ghế và trạng thái đặt
         seat_list = []
         for seat in seats:
-            status = "Đã đặt" if seat.GheID in booked_seat_ids else "Còn trống"
+            status = 1 if seat.GheID in booked_seat_ids else 0  # 1 là đã đặt, 0 là chưa đặt
             seat_list.append({
                 "GheID": seat.GheID,
                 "SoGhe": seat.SoGhe,
@@ -132,75 +132,75 @@ def print_seats_in_carriage(toa_id, ngay_khoi_hanh):
     finally:
         session.close()
 
-def book_ticket(data):
-    """
-    Hàm đặt vé sau khi đã chọn được chuyến tàu phù hợp.
-    """
-    session = Session()
-    try:
-        # Bắt đầu transaction với isolation level SERIALIZABLE
-        session.begin()
-        session.connection().execution_options(isolation_level="SERIALIZABLE")
-
-        # Kiểm tra xem ghế đã được đặt chưa
-        existing_ticket = session.query(ChiTietHoaDon).filter_by(
-            GheID=data['GheID'],
-            TauID=data['TauID'],
-            NgayKhoiHanh=datetime.strptime(data['NgayKhoiHanh'], '%Y-%m-%d %H:%M:%S')
-        ).with_for_update().first()
-
-        if existing_ticket:
-            session.rollback()
-            return {"status": "error", "message": "Ghế này đã được đặt, vui lòng chọn ghế khác."}
-
-        # Tạo hóa đơn mới
-        new_hoadon = HoaDon(
-            TenKH=data['TenKH'],
-            DiaChi=data['DiaChi'],
-            SDT=data['SDT'],
-            ThoiGian=datetime.now(),
-            NhanVienID=data['NhanVienID'],
-            SoTien=0
-        )
-        session.add(new_hoadon)
-        session.flush()
-
-        # Tạo chi tiết hóa đơn mới
-        new_cthd = ChiTietHoaDon(
-            GheID=data['GheID'],
-            TauID=data['TauID'],
-            GaDi=data['GaDi'],
-            GaDen=data['GaDen'],
-            HoaDonID=new_hoadon.HoaDonID,
-            NgayKhoiHanh=datetime.strptime(data['NgayKhoiHanh'], '%Y-%m-%d %H:%M:%S')
-        )
-        session.add(new_cthd)
-
-        # Cập nhật giá tiền từ bảng giá
-        bang_gia = session.query(BangGia).filter_by(
-            TauID=data['TauID'],
-            GheID=data['GheID'],
-            GaDi=data['GaDi'],
-            GaDen=data['GaDen']
-        ).with_for_update().first()
-
-        if bang_gia:
-            new_hoadon.SoTien = bang_gia.GiaTien
-            session.commit()
-            return {"status": "success", "message": "Đặt vé thành công.", "HoaDonID": new_hoadon.HoaDonID}
-        else:
-            session.rollback()
-            return {"status": "error", "message": "Không tìm thấy giá vé."}
-
-    except IntegrityError:
-        session.rollback()
-        return {"status": "error", "message": "Lỗi integrity, có thể do trùng lặp dữ liệu."}
-    except Exception as e:
-        session.rollback()
-        logging.error(f"Lỗi khi đặt vé: {str(e)}")
-        return {"status": "error", "message": "Đã xảy ra lỗi khi xử lý đặt vé."}
-    finally:
-        session.close()
+# def book_ticket(data):
+#     """
+#     Hàm đặt vé sau khi đã chọn được chuyến tàu phù hợp.
+#     """
+#     session = Session()
+#     try:
+#         # Bắt đầu transaction với isolation level SERIALIZABLE
+#         session.begin()
+#         session.connection().execution_options(isolation_level="SERIALIZABLE")
+#
+#         # Kiểm tra xem ghế đã được đặt chưa
+#         existing_ticket = session.query(ChiTietHoaDon).filter_by(
+#             GheID=data['GheID'],
+#             TauID=data['TauID'],
+#             NgayKhoiHanh=datetime.strptime(data['NgayKhoiHanh'], '%Y-%m-%d %H:%M:%S')
+#         ).with_for_update().first()
+#
+#         if existing_ticket:
+#             session.rollback()
+#             return {"status": "error", "message": "Ghế này đã được đặt, vui lòng chọn ghế khác."}
+#
+#         # Tạo hóa đơn mới
+#         new_hoadon = HoaDon(
+#             TenKH=data['TenKH'],
+#             DiaChi=data['DiaChi'],
+#             SDT=data['SDT'],
+#             ThoiGian=datetime.now(),
+#             NhanVienID=data['NhanVienID'],
+#             SoTien=0
+#         )
+#         session.add(new_hoadon)
+#         session.flush()
+#
+#         # Tạo chi tiết hóa đơn mới
+#         new_cthd = ChiTietHoaDon(
+#             GheID=data['GheID'],
+#             TauID=data['TauID'],
+#             GaDi=data['GaDi'],
+#             GaDen=data['GaDen'],
+#             HoaDonID=new_hoadon.HoaDonID,
+#             NgayKhoiHanh=datetime.strptime(data['NgayKhoiHanh'], '%Y-%m-%d %H:%M:%S')
+#         )
+#         session.add(new_cthd)
+#
+#         # Cập nhật giá tiền từ bảng giá
+#         bang_gia = session.query(BangGia).filter_by(
+#             TauID=data['TauID'],
+#             GheID=data['GheID'],
+#             GaDi=data['GaDi'],
+#             GaDen=data['GaDen']
+#         ).with_for_update().first()
+#
+#         if bang_gia:
+#             new_hoadon.SoTien = bang_gia.GiaTien
+#             session.commit()
+#             return {"status": "success", "message": "Đặt vé thành công.", "HoaDonID": new_hoadon.HoaDonID}
+#         else:
+#             session.rollback()
+#             return {"status": "error", "message": "Không tìm thấy giá vé."}
+#
+#     except IntegrityError:
+#         session.rollback()
+#         return {"status": "error", "message": "Lỗi integrity, có thể do trùng lặp dữ liệu."}
+#     except Exception as e:
+#         session.rollback()
+#         logging.error(f"Lỗi khi đặt vé: {str(e)}")
+#         return {"status": "error", "message": "Đã xảy ra lỗi khi xử lý đặt vé."}
+#     finally:
+#         session.close()
 
 def get_all_routes():
     """
@@ -230,20 +230,86 @@ def get_all_routes():
     finally:
         session.close()
 
+
+from sqlalchemy.orm import Session
+
+
+def get_start_and_destination_stations(tau_id):
+    session = Session(bind=engine)
+    try:
+        # Lấy danh sách các ga đi và ga đến của tàu đã chọn
+        ga_di_va_ga_den = session.query(
+            GioTau.GioID,
+            Ga.Ten.label("GaDi"),
+            GioTau.GioDi,
+            session.query(Ga.Ten).filter(Ga.GaID == GioTau.GaID).label("GaDen"),
+            GioTau.GioDen
+        ).join(Ga, Ga.GaID == GioTau.GaID).filter(GioTau.TauID == tau_id).all()
+
+        if not ga_di_va_ga_den:
+            return {"status": "error", "message": "Không có ga đi hoặc ga đến nào cho tàu này."}
+
+        # Chuyển dữ liệu thành danh sách dễ sử dụng
+        ga_list = []
+        for ga in ga_di_va_ga_den:
+            ga_list.append({
+                "GioID": ga.GioID,
+                "GaDi": ga.GaDi,
+                "GioDi": ga.GioDi,
+                "GaDen": ga.GaDen,
+                "GioDen": ga.GioDen
+            })
+
+        return {"status": "success", "data": ga_list}
+
+    except Exception as e:
+        logging.error(f"Lỗi khi truy vấn ga: {str(e)}")
+        return {"status": "error", "message": "Đã xảy ra lỗi khi truy vấn ga đi và ga đến."}
+    finally:
+        session.close()
+
+
+def get_price(tau_id, ga_di_id, ga_den_id, ghe_id):
+    session = Session(bind=engine)
+    try:
+        # Truy vấn bảng BangGia để lấy giá tiền dựa trên ga đi, ga đến, tàu và ghế
+        gia_tien = session.query(BangGia.GiaTien).filter(
+            BangGia.TauID == tau_id,
+            BangGia.GaDi == ga_di_id,
+            BangGia.GaDen == ga_den_id,
+            BangGia.GheID == ghe_id
+        ).first()
+
+        if not gia_tien:
+            return {"status": "error", "message": "Không tìm thấy giá tiền cho chuyến đi này."}
+
+        return {"status": "success", "gia_tien": gia_tien.GiaTien}
+
+    except Exception as e:
+        logging.error(f"Lỗi khi lấy giá tiền: {str(e)}")
+        return {"status": "error", "message": "Đã xảy ra lỗi khi lấy giá tiền."}
+    finally:
+        session.close()
+
+
 def handle_request(action, data):
     """
     Hàm xử lý yêu cầu dựa trên loại hành động (action).
     """
     if action == "search_trains":
         return search_trains(data['TuyenID'], data['NgayKhoiHanh'])
-    elif action == "book_ticket":
-        return book_ticket(data)
+    # elif action == "book_ticket":
+    #     return book_ticket(data)
     elif action == "get_all_routes":
         return get_all_routes()
     elif action == "print_carriages":
         return print_carriages(data['tau_id'])
     elif action == "get_seats_in_carriage":
         return print_seats_in_carriage(data['toa_id'], data['ngay_khoi_hanh'])
+    elif action == "get_start_and_destination_stations":
+        return get_start_and_destination_stations(data['tau_id'])
+    elif action == "get_price":
+        return get_price(data['tau_id'], data['ga_di_id'], data['ga_den_id'], data['ghe_id'])
     else:
         return {"status": "error", "message": "Hành động không hợp lệ."}
 
@@ -265,7 +331,7 @@ def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((HOST,PORT))
     sock.listen()
-    logging.info("Server đang lắng nghe tại 127.0.0.1:2704...")
+    logging.info(f"Server đang lắng nghe tại {HOST}:{PORT}")
 
     while True:
         connection, address = sock.accept()
