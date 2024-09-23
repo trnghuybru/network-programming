@@ -221,7 +221,9 @@ def get_price(tau_id, ga_di_id, ga_den_id, ghe_id):
         if not gia_tien:
             return {"status": "error", "message": "Không tìm thấy giá tiền cho chuyến đi này."}
 
-        return {"status": "success", "gia_tien": gia_tien.GiaTien}
+        return {"status": "success", "data": {
+            "gia_tien": gia_tien[0]  # Lấy giá tiền từ tuple
+        }}
 
     except Exception as e:
         logging.error(f"Lỗi khi lấy giá tiền: {str(e)}")
