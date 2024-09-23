@@ -2,12 +2,13 @@ import tkinter as tk
 from tkinter import ttk
 import socket
 import json
+import subprocess  # Để chạy bookticket.py
 
 
 # Hàm kết nối qua socket để gửi và nhận dữ liệu từ server
 def get_all_stations():
-    host = '192.168.1.20'  # Địa chỉ host của server
-    port = 27047  # Port của server
+    host = '172.20.10.3'  # Địa chỉ host của server
+    port = 27049  # Port của server
 
     request_data = json.dumps({"action": "get_all_routes"})  # Dữ liệu gửi đi (JSON)
     buffer_size = 4096  # Kích thước bộ đệm nhận dữ liệu
@@ -30,7 +31,6 @@ def get_all_stations():
 
             # Giải mã dữ liệu nhận được từ server
             stations = json.loads(response_data.decode('utf-8'))
-            print(f"Nhan duoc data: {stations}")
             return stations
     except socket.error as e:
         print(f"Lỗi khi kết nối đến server: {e}")
@@ -39,13 +39,13 @@ def get_all_stations():
 
 # Hàm tìm kiếm chuyến tàu
 def search_trains(tuyen, huong, ngay_di):
-    host = '192.168.1.20'
-    port = 27047
+    host = '172.20.10.3'
+    port = 27049
     request_data = json.dumps({
         "action": "search_trains",
         "data": {
-            "TuyenID": tuyen,  # Đã đổi tên biến để phản ánh sự thay đổi
-            "Huong": huong,  # Đã đổi tên biến để phản ánh sự thay đổi
+            "TuyenID": tuyen,
+            "Huong": huong,
             "NgayKhoiHanh": ngay_di
         }
     })
@@ -68,10 +68,47 @@ def search_trains(tuyen, huong, ngay_di):
 
             # Giải mã dữ liệu nhận được từ server
             trains_data = json.loads(response_data.decode('utf-8'))
+            print(f"Cac tau kha dung: {trains_data}")
             return trains_data
     except socket.error as e:
         print(f"Lỗi khi kết nối đến server: {e}")
         return None
+
+
+# Hàm gửi yêu cầu lấy thông tin toa tàu
+# Hàm gửi yêu cầu lấy thông tin toa tàu
+def print_carriages(tau_id):
+    host = '172.20.10.3'
+    port = 27049
+    request_data = json.dumps({
+        "action": "print_carriages",
+        "data": {
+            "tau_id": tau_id
+        }
+    })
+    print(f"Request print_carriages: {request_data}")  # In request
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((host, port))
+            s.sendall(request_data.encode('utf-8'))
+
+            response_data = b""
+            while True:
+                part = s.recv(4096)
+                if not part:
+                    break
+                response_data += part
+
+            response = response_data.decode('utf-8')
+            print(f"Response from server: {response}")  # In toàn bộ phản hồi từ server
+            carriages_data = json.loads(response)
+            return carriages_data
+    except socket.error as e:
+        print(f"Lỗi khi kết nối đến server: {e}")
+        return None
+
+
 
 
 # Điền dữ liệu vào các combobox
@@ -82,57 +119,95 @@ def populate_comboboxes():
         print("Lỗi khi lấy dữ liệu từ máy chủ.")
         return
 
-    tuyen_list = []
+    tuyen_dict = {}
     huong_list = []
 
-    # Lấy dữ liệu chỉ gồm GaID và Ten, hiển thị Ten
     for station in stations_data.get('data', []):
-        tuyen_list.append(station['Ten'])  # Chỉ lấy 'Ten'
-        huong_list.append(station['Ten'])  # Chỉ lấy 'Ten'
+        tuyen_dict[station['Ten']] = station['TuyenID']
+        huong_list.append(station['Ten'])
 
-    # Điền dữ liệu vào các combobox
-    combobox_tuyen['values'] = tuyen_list
+    combobox_tuyen['values'] = list(tuyen_dict.keys())
     combobox_huong['values'] = huong_list
+
+    return tuyen_dict
 
 
 # Hàm gọi khi nhấn nút tìm kiếm
+# Hiển thị thông tin chuyến tàu và tạo nút Đặt vé
 def tim_kiem():
-    tuyen = combobox_tuyen.get()  # Lấy giá trị từ combobox 'Tên tuyến'
-    huong = combobox_huong.get()  # Lấy giá trị từ combobox 'Hướng'
-    ngay_khoi_hanh = entry_date.get()  # Lấy giá trị từ input 'Ngày khởi hành'
+    tuyen = combobox_tuyen.get()
+    huong = combobox_huong.get()
+    ngay_khoi_hanh = entry_date.get()
 
-    # Gọi hàm search_trains để gửi dữ liệu tới server
-    trains_data = search_trains(tuyen, huong, ngay_khoi_hanh)
+    tuyen_dict = populate_comboboxes()
+    tuyen_id = tuyen_dict.get(tuyen)
+
+    if not tuyen_id:
+        label_ket_qua.config(text="Không tìm thấy TuyenID cho tên tuyến này.")
+        return
+
+    trains_data = search_trains(tuyen_id, huong, ngay_khoi_hanh)
 
     if trains_data is None:
-        result_text = "Lỗi khi tìm kiếm chuyến tàu."
+        label_ket_qua.config(text="Lỗi khi tìm kiếm chuyến tàu.")
     elif trains_data.get('status') == 'success':
-        found_route = False
-        result_text = f"Tuyến tàu từ {tuyen} đến {huong} khởi hành vào {ngay_khoi_hanh}:\n"
+        label_ket_qua.config(text="Tìm thấy các chuyến tàu phù hợp.")
 
+        # Xóa các kết quả cũ trước khi hiển thị kết quả mới
+        for widget in result_frame.winfo_children():
+            widget.destroy()
+
+        row_index = 0
         for train in trains_data.get('data', []):
-            found_route = True
-            result_text += f"- Tàu {train['ten_tau']}, giờ khởi hành: {train['gio_khoi_hanh']}\n"
+            # Hiển thị thông tin chuyến tàu
+            train_info = f"Tàu {train['TenTau']}, giờ khởi hành: {train['GioDi']}"
+            label_train_info = tk.Label(result_frame, text=train_info, width=40, bg="#f0f0f0", anchor="w",
+                                        justify="left")
+            label_train_info.grid(row=row_index, column=0, padx=10, pady=5, sticky="w")
 
-        if not found_route:
-            result_text = f"Không tìm thấy chuyến tàu từ {tuyen} đến {huong} vào ngày {ngay_khoi_hanh}."
+            # Tạo nút Đặt vé và truyền tên tuyến cùng ID của tàu
+            button_dat_ve = tk.Button(result_frame, text="Đặt vé", width=10, bg="green", fg="white",
+                                      command=lambda tau_id=train['TauID']: dat_ve(combobox_tuyen.get(), tau_id))
+            button_dat_ve.grid(row=row_index, column=1, padx=10, pady=5, sticky="w")
+
+            row_index += 1
+
     else:
-        result_text = "Không tìm thấy chuyến tàu phù hợp."
+        label_ket_qua.config(text="Không tìm thấy chuyến tàu phù hợp.")
 
-    label_ket_qua.config(text=result_text)
+
+
+
+
+# Hàm mở form Đặt vé
+# Hàm gọi khi nhấn nút Đặt vé
+def dat_ve(ten_tuyen, tau_id):
+    print(f"Đặt vé cho tuyến {ten_tuyen}, tàu {tau_id}")
+
+    # Gửi yêu cầu lấy thông tin toa tàu
+    carriages_data = print_carriages(tau_id)
+
+    if carriages_data is None or carriages_data.get('status') != 'success':
+        print(f"Toa tàu: {carriages_data}")
+        print("Lỗi khi lấy thông tin toa tàu.")
+        return
+
+    # Truyền danh sách tên toa (giả sử server trả về danh sách các toa)
+    ds_toa = ",".join([toa['TenToa'] for toa in carriages_data.get('data', [])])
+    subprocess.Popen(['python3', 'seat.py', ten_tuyen, ds_toa])
 
 
 # Tạo cửa sổ chính
 root = tk.Tk()
 root.title("Metroway Dashboard")
 root.geometry("800x500")
-root.configure(bg="white")  # Set background to white
+root.configure(bg="white")
 
 # Title Label
 title_label = tk.Label(root, text="Dashboard", font=("Arial", 20), bg="white", fg="blue")
 title_label.grid(row=0, column=0, columnspan=3, pady=10, padx=20, sticky="w")
 
-# Input fields for 'Tên tuyến', 'Hướng', and 'Ngày khởi hành'
+# Input fields
 input_frame = tk.Frame(root, bg="white")
 input_frame.grid(row=1, column=0, padx=20, pady=10, sticky="w")
 
@@ -162,31 +237,13 @@ populate_comboboxes()
 results_label = tk.Label(root, text="Kết quả", font=("Arial", 14), bg="white")
 results_label.grid(row=3, column=0, padx=20, pady=10, sticky="w")
 
+# Label for search result status
+label_ket_qua = tk.Label(root, text="", font=("Arial", 12), bg="white", fg="red")
+label_ket_qua.grid(row=3, column=1, padx=10, pady=10, sticky="w")
+
 # Result placeholders
 result_frame = tk.Frame(root, bg="white")
-result_frame.grid(row=4, column=0, padx=20, sticky="w")
-
-label_ket_qua = tk.Label(result_frame, text="", width=60, height=2, bg="#f0f0f0", relief="solid", anchor="w",
-                         justify="left")
-label_ket_qua.grid(row=0, column=0, pady=5)
-
-# Side menu for 'Đặt vé', 'Danh sách vé đã đặt', and 'Thống kê'
-side_frame = tk.Frame(root, bg="white")
-side_frame.grid(row=1, column=1, rowspan=2, padx=30, pady=10, sticky="n")
-
-side_label1 = tk.Label(side_frame, text="Đặt vé", font=("Arial", 12), bg="white")
-side_label1.pack(pady=10)
-side_label2 = tk.Label(side_frame, text="Danh sách vé đã đặt", font=("Arial", 12), bg="white")
-side_label2.pack(pady=10)
-side_label3 = tk.Label(side_frame, text="Thống kê", font=("Arial", 12), bg="white")
-side_label3.pack(pady=10)
-
-# Notifications area
-notif_frame = tk.Frame(root, bg="white")
-notif_frame.grid(row=3, column=1, padx=30, pady=10, sticky="n")
-
-notif_label = tk.Label(notif_frame, text="Thông báo", font=("Arial", 12), bg="white")
-notif_label.pack(pady=10)
+result_frame.grid(row=4, column=0, padx=20, pady=10, sticky="w")
 
 # Start the main loop
 root.mainloop()

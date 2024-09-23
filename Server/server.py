@@ -13,7 +13,7 @@ from models import HoaDon, ChiTietHoaDon, BangGia, GioTau, Tuyen, Tau, Ga, Toa, 
 
 
 
-HOST = "192.168.1.164"
+HOST = "192.168.48.135"
 PORT = 27049
 
 # Cấu hình logging

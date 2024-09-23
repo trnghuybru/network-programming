@@ -1,0 +1,21 @@
+<RCC>
+  <qresource prefix="icon">
+    <file>icon/Ticket-Linear-80px.png</file>
+    <file>icon/Ticket-Linear-White80px (1).png</file>
+    <file>icon/Metroway.png</file>
+    <file>icon/logo.png</file>
+    <file>icon/dashboard.png</file>
+    <file>icon/dashboard_white.png</file>
+    <file>icon/image.png</file>
+    <file>icon/log_out.png</file>
+    <file>icon/log_out_white.png</file>
+    <file>icon/menu.png</file>
+    <file>icon/notifications.png</file>
+    <file>icon/notifications_white.png</file>
+    <file>icon/profile.png</file>
+    <file>icon/profile_white.png</file>
+    <file>icon/search.png</file>
+    <file>icon/settings.png</file>
+    <file>icon/settings_white.png</file>
+  </qresource>
+</RCC>
