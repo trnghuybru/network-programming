@@ -253,7 +253,9 @@ def seat_locking(tau_id, ghe_id, ngay_khoi_hanh):
         # Truy vấn ghế với khóa
         ghe = session.query(Ghe).filter(
             Ghe.GheID == ghe_id
-        ).with_for_update().first()
+        ).with_for_update().one()
+
+        print(f"{ghe} ghe id la {ghe_id}")
 
         if not ghe:
             return {"status": "error", "message": "Ghế không tồn tại."}
