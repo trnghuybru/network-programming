@@ -166,19 +166,16 @@ def get_start_and_destination_stations(tau_id):
     try:
         # Truy vấn dữ liệu
         ga_di_va_ga_den = session.query(
-            GioTau.GioID,
-            Ga.Ten.label("GaDi"),
             BangGia.GaDi.label("GaDiID"),  # ID của ga đi
-            Ga.Ten.label("GaDen"),
-            GioTau.GaID.label("GaDenID"),  # ID của ga đến (từ GioTau)
-            GioTau.GioDi,
-            GioTau.GioDen
+            Ga.Ten.label("GaDi"),           # Tên ga đi
+            BangGia.GaDen.label("GaDenID"),  # ID của ga đến
+            Ga.Ten.label("GaDen")           # Tên ga đến
         ).join(
-            BangGia, GioTau.TauID == BangGia.TauID  # Liên kết với bảng BangGia
+            GioTau, GioTau.TauID == BangGia.TauID  # Liên kết với bảng GioTau
         ).join(
             Ga, BangGia.GaDi == Ga.GaID  # Lấy tên ga đi
         ).join(
-            Ga, GioTau.GaID == Ga.GaID  # Lấy tên ga đến
+            Ga, BangGia.GaDen == Ga.GaID  # Lấy tên ga đến
         ).filter(
             GioTau.TauID == tau_id
         ).distinct().all()
@@ -190,13 +187,10 @@ def get_start_and_destination_stations(tau_id):
         ga_list = []
         for ga in ga_di_va_ga_den:
             ga_list.append({
-                "GioID": ga.GioID,
+                "GaDiID": ga.GaDiID,
                 "GaDi": ga.GaDi,
-                "GaDiID": ga.GaDiID,  # ID của ga đi từ BangGia
-                "GioDi": ga.GioDi,
-                "GaDen": ga.GaDen,
-                "GaDenID": GioTau.GaID,  # ID của ga đến từ GioTau
-                "GioDen": ga.GioDen
+                "GaDenID": ga.GaDenID,
+                "GaDen": ga.GaDen
             })
 
         return {"status": "success", "data": ga_list}
