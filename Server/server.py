@@ -164,18 +164,22 @@ def get_all_routes():
 def get_start_and_destination_stations(tau_id):
     session = Session(bind=engine)
     try:
+        # Tạo alias cho bảng Ga
+        ga_di = Ga.__table__.alias("ga_di")  # Alias cho ga đi
+        ga_den = Ga.__table__.alias("ga_den")  # Alias cho ga đến
+
         # Truy vấn dữ liệu
         ga_di_va_ga_den = session.query(
             BangGia.GaDi.label("GaDiID"),  # ID của ga đi
-            Ga.Ten.label("GaDi"),           # Tên ga đi
+            ga_di.c.Ten.label("GaDi"),      # Tên ga đi
             BangGia.GaDen.label("GaDenID"),  # ID của ga đến
-            Ga.Ten.label("GaDen")           # Tên ga đến
+            ga_den.c.Ten.label("GaDen")      # Tên ga đến
         ).join(
             GioTau, GioTau.TauID == BangGia.TauID  # Liên kết với bảng GioTau
         ).join(
-            Ga, BangGia.GaDi == Ga.GaID  # Lấy tên ga đi
+            ga_di, BangGia.GaDi == ga_di.c.GaID  # Lấy tên ga đi
         ).join(
-            Ga, BangGia.GaDen == Ga.GaID  # Lấy tên ga đến
+            ga_den, BangGia.GaDen == ga_den.c.GaID  # Lấy tên ga đến
         ).filter(
             GioTau.TauID == tau_id
         ).distinct().all()
@@ -200,6 +204,7 @@ def get_start_and_destination_stations(tau_id):
         return {"status": "error", "message": "Đã xảy ra lỗi khi truy vấn ga đi và ga đến."}
     finally:
         session.close()
+
 
 
 def get_price(tau_id, ga_di_id, ga_den_id, ghe_id):
