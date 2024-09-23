@@ -13,7 +13,7 @@ from models import HoaDon, ChiTietHoaDon, BangGia, GioTau, Tuyen, Tau, Ga, Toa, 
 
 
 
-HOST = "172.20.10.3"
+HOST = "192.168.1.10"
 PORT = 27049
 
 # Cấu hình logging
@@ -164,14 +164,23 @@ def get_all_routes():
 def get_start_and_destination_stations(tau_id):
     session = Session(bind=engine)
     try:
-        # Lấy danh sách các ga đi và ga đến của tàu đã chọn
+        # Truy vấn dữ liệu
         ga_di_va_ga_den = session.query(
             GioTau.GioID,
             Ga.Ten.label("GaDi"),
+            BangGia.GaDi,
+            Ga.Ten.label("GaDen"),
             GioTau.GioDi,
-            session.query(Ga.Ten).filter(Ga.GaID == GioTau.GaID).label("GaDen"),
             GioTau.GioDen
-        ).join(Ga, Ga.GaID == GioTau.GaID).filter(GioTau.TauID == tau_id).all()
+        ).join(
+            BangGia, GioTau.TauID == BangGia.TauID  # Liên kết với bảng BangGia
+        ).join(
+            Ga, BangGia.GaDi == Ga.GaID  # Lấy tên ga đi
+        ).join(
+            Ga, GioTau.GaID == Ga.GaID  # Lấy tên ga đến
+        ).filter(
+            GioTau.TauID == tau_id
+        ).distinct().all()
 
         if not ga_di_va_ga_den:
             return {"status": "error", "message": "Không có ga đi hoặc ga đến nào cho tàu này."}
