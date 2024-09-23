@@ -260,7 +260,6 @@ def seat_locking(tau_id, ghe_id, ngay_khoi_hanh):
         if not ghe:
             return {"status": "error", "message": "Ghế không tồn tại."}
 
-        # Kiểm tra xem ghế đã được đặt cho chuyến tàu này vào ngày khởi hành này chưa
         is_booked = session.query(ChiTietHoaDon).filter(
             and_(
                 ChiTietHoaDon.GheID == ghe_id,
@@ -287,8 +286,7 @@ def seat_locking(tau_id, ghe_id, ngay_khoi_hanh):
         session.close()
 
 
-def place_ticket_order(tuyen_id, tau_id, ga_di, ga_den, ngay_khoi_hanh, ten_kh, dia_chi, sdt, nhan_vien_id, ghe_id):
-    Session = sessionmaker(bind=engine)
+def place_ticket_order(tuyen_id, tau_id, ga_di, ga_den, ngay_khoi_hanh, ten_kh, dia_chi, sdt, nhan_vien_id, ghe_id, so_tien):
     session = Session()
 
     # Tạo hóa đơn
@@ -296,8 +294,9 @@ def place_ticket_order(tuyen_id, tau_id, ga_di, ga_den, ngay_khoi_hanh, ten_kh, 
         TenKH=ten_kh,
         DiaChi=dia_chi,
         SDT=sdt,
+        ThoiGian=datetime.now(),  # Sử dụng datetime.now() để lấy thời gian hiện tại
         NhanVienID=nhan_vien_id,
-        SoTien=0.0  # Cần cập nhật sau khi tính tiền
+        SoTien=so_tien
     )
 
     session.add(hoa_don)
@@ -341,7 +340,8 @@ def handle_request(action, data):
             dia_chi=data['DiaChi'],
             sdt=data['SDT'],
             nhan_vien_id=data['NhanVienID'],
-            ghe_id=data['GheID']
+            ghe_id=data['GheID'],
+            so_tien=data['SoTien']
         )
     elif action == "get_all_routes":
         return get_all_routes()
