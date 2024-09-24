@@ -1,85 +1,107 @@
 import tkinter as tk
 from tkinter import messagebox
-import requests
+import sys
+import socket
+import json
 
-# Hàm để gửi yêu cầu đặt vé
-def book_ticket():
-    ten_kh = entry_ten_kh.get()
-    dia_chi = entry_dia_chi.get()
-    sdt = entry_sdt.get()
-    ghe_id = entry_ghe_id.get()
-    tau_id = entry_tau_id.get()
-    ga_di = entry_ga_di.get()
-    ga_den = entry_ga_den.get()
-    ngay_khoi_hanh = entry_ngay_khoi_hanh.get()
-    nhan_vien_id = entry_nhan_vien_id.get()
+# Lấy các tham số truyền vào từ dòng lệnh
+ten_tuyen = sys.argv[1] if len(sys.argv) > 1 else "Không rõ tuyến"
+tau_id = sys.argv[2] if len(sys.argv) > 2 else "1"
+ga_di_id = sys.argv[3] if len(sys.argv) > 3 else "Không rõ Ga đi"
+ga_den_id = sys.argv[4] if len(sys.argv) > 4 else "Không rõ Ga đến"
+ngay_khoi_hanh = sys.argv[5] if len(sys.argv) > 5 else "Không rõ ngày"
+ghe_id = sys.argv[6] if len(sys.argv) > 6 else "Không rõ ghế"
+gia_ve = sys.argv[7] if len(sys.argv) > 7 else "0.0"  # Giá vé
 
-    # Kiểm tra đầu vào
-    if not all([ten_kh, dia_chi, sdt, ghe_id, tau_id, ga_di, ga_den, ngay_khoi_hanh, nhan_vien_id]):
-        messagebox.showerror("Lỗi", "Vui lòng điền đầy đủ thông tin")
+# Tạo cửa sổ chính
+root = tk.Tk()
+root.title("Đặt vé tàu")
+root.geometry("500x700")
+
+# Hiển thị thông tin đã được truyền qua
+tk.Label(root, text="Thông tin đặt vé", font=("Arial", 16)).pack(pady=10)
+
+tk.Label(root, text=f"Tuyến: {ten_tuyen}", font=("Arial", 12)).pack(pady=5)
+tk.Label(root, text=f"Tàu ID: {tau_id}", font=("Arial", 12)).pack(pady=5)
+tk.Label(root, text=f"Ga đi ID: {ga_di_id}", font=("Arial", 12)).pack(pady=5)
+tk.Label(root, text=f"Ga đến ID: {ga_den_id}", font=("Arial", 12)).pack(pady=5)
+tk.Label(root, text=f"Ngày khởi hành: {ngay_khoi_hanh}", font=("Arial", 12)).pack(pady=5)
+tk.Label(root, text=f"Ghế ID: {ghe_id}", font=("Arial", 12)).pack(pady=5)
+tk.Label(root, text=f"Giá vé: {gia_ve} VND", font=("Arial", 12)).pack(pady=5)
+
+# Tạo các ô nhập thông tin người dùng
+tk.Label(root, text="Tên khách hàng:", font=("Arial", 12)).pack(pady=5)
+entry_name = tk.Entry(root, width=30)
+entry_name.pack(pady=5)
+
+tk.Label(root, text="Địa chỉ:", font=("Arial", 12)).pack(pady=5)
+entry_address = tk.Entry(root, width=30)
+entry_address.pack(pady=5)
+
+tk.Label(root, text="Số điện thoại:", font=("Arial", 12)).pack(pady=5)
+entry_phone = tk.Entry(root, width=30)
+entry_phone.pack(pady=5)
+
+tk.Label(root, text="Nhân viên ID:", font=("Arial", 12)).pack(pady=5)
+entry_staff_id = tk.Entry(root, width=30)
+entry_staff_id.pack(pady=5)
+
+# Hàm gửi yêu cầu đặt vé tới server
+def send_booking_request(booking_data):
+    HOST = '172.20.10.3'
+    PORT = 27049
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((HOST, PORT))
+            s.sendall(json.dumps(booking_data).encode('utf-8'))
+            response = s.recv(4096)
+            return json.loads(response.decode('utf-8'))
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# Hàm xử lý khi nhấn nút "Xác nhận"
+def confirm_ticket():
+    customer_name = entry_name.get()
+    address = entry_address.get()
+    phone = entry_phone.get()
+    staff_id = entry_staff_id.get()
+
+    if not customer_name or not address or not phone or not staff_id:
+        messagebox.showwarning("Cảnh báo", "Vui lòng điền đầy đủ thông tin.")
         return
 
-    # Dữ liệu để gửi lên server
-    data = {
+    # Tạo dữ liệu để gửi tới server
+    booking_data = {
         "action": "book_ticket",
         "data": {
-            "TenKH": ten_kh,
-            "DiaChi": dia_chi,
-            "SDT": sdt,
-            "GheID": int(ghe_id),
+            "TuyenID": 1,  # ID của tuyến, ở đây bạn có thể thay đổi hoặc lấy từ nguồn khác
             "TauID": int(tau_id),
-            "GaDi": int(ga_di),
-            "GaDen": int(ga_den),
+            "GaDi": ga_di_id,
+            "GaDen": ga_den_id,
             "NgayKhoiHanh": ngay_khoi_hanh,
-            "NhanVienID": int(nhan_vien_id)
+            "TenKH": customer_name,
+            "DiaChi": address,
+            "SDT": phone,
+            "NhanVienID": int(staff_id),
+            "GheID": int(ghe_id),
+            "SoTien": float(gia_ve)  # Giá vé
         }
     }
 
-    try:
-        # Giả lập request API (đặt đường dẫn API của bạn)
-        response = requests.post("https://your-api-url.com/book_ticket", json=data)
+    # Gửi yêu cầu tới server
+    response = send_booking_request(booking_data)
 
-        # Kiểm tra kết quả
-        if response.status_code == 200:
-            messagebox.showinfo("Thành công", "Đặt vé thành công!")
-        else:
-            messagebox.showerror("Thất bại", "Đặt vé thất bại.")
-    except Exception as e:
-        messagebox.showerror("Lỗi", f"Không thể kết nối tới server: {e}")
+    # Xử lý phản hồi từ server
+    if response.get("status") == "success":
+        messagebox.showinfo("Thành công", "Đặt vé thành công!")
+    else:
+        error_message = response.get("message", "Không thể đặt vé. Vui lòng thử lại sau.")
+        messagebox.showerror("Lỗi", error_message)
 
-# Tạo giao diện người dùng
-root = tk.Tk()
-root.title("Đặt vé tàu")
-root.geometry("400x500")
-root.configure(bg="#f0f0f0")
+# Nút xác nhận
+btn_confirm = tk.Button(root, text="Xác nhận", width=20, height=2, bg="green", fg="white", command=confirm_ticket)
+btn_confirm.pack(pady=20)
 
-# Tiêu đề
-title_label = tk.Label(root, text="Form Đặt Vé Tàu", font=("Arial", 20), bg="#f0f0f0", fg="blue")
-title_label.pack(pady=10)
-
-# Các trường nhập thông tin khách hàng
-def add_label_entry(text, root):
-    frame = tk.Frame(root, bg="#f0f0f0")
-    frame.pack(pady=5)
-    label = tk.Label(frame, text=text, font=("Arial", 12), width=15, anchor="w", bg="#f0f0f0")
-    label.pack(side="left")
-    entry = tk.Entry(frame, width=25)
-    entry.pack(side="left")
-    return entry
-
-entry_ten_kh = add_label_entry("Tên khách hàng", root)
-entry_dia_chi = add_label_entry("Địa chỉ", root)
-entry_sdt = add_label_entry("Số điện thoại", root)
-entry_ghe_id = add_label_entry("ID ghế", root)
-entry_tau_id = add_label_entry("ID tàu", root)
-entry_ga_di = add_label_entry("Ga đi (ID)", root)
-entry_ga_den = add_label_entry("Ga đến (ID)", root)
-entry_ngay_khoi_hanh = add_label_entry("Ngày khởi hành", root)
-entry_nhan_vien_id = add_label_entry("ID nhân viên", root)
-
-# Nút đặt vé
-book_button = tk.Button(root, text="Đặt vé", font=("Arial", 12), bg="green", fg="white", command=book_ticket)
-book_button.pack(pady=20)
-
-# Chạy chương trình
+# Bắt đầu vòng lặp chính
 root.mainloop()

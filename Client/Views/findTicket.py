@@ -194,7 +194,8 @@ def dat_ve(ten_tuyen, tau_id):
 
     # Truyền danh sách tên toa (giả sử server trả về danh sách các toa)
     ds_toa = ",".join([toa['TenToa'] for toa in carriages_data.get('data', [])])
-    subprocess.Popen(['python3', 'seat.py', ten_tuyen, ds_toa])
+    subprocess.Popen(['python3', 'network-programming/Client/Views/seat.py', ten_tuyen, ds_toa, str(tau_id)])  # Chuyển tau_id sang chuỗi
+
 
 
 # Tạo cửa sổ chính
